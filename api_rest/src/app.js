@@ -5,6 +5,7 @@ import './database';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import delay from 'express-delay';
 
 import homeRoutes from './routes/homeRoutes';
 import userRoutes from './routes/userRoutes';
@@ -20,12 +21,12 @@ const whiteList = [
 
 const corsOptions = {
   origin: function (origin, callback) {
-    if(whiteList.indexOf(origin) !== -1 || !origin) {
+    if (whiteList.indexOf(origin) !== -1 || !origin) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
-  }
+  },
 };
 
 class App {
@@ -38,9 +39,13 @@ class App {
   middlewares() {
     this.app.use(cors(corsOptions));
     this.app.use(helmet());
+    this.app.use(delay(2000));
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(express.json());
-    this.app.use('/images/', express.static(resolve(__dirname, '..', 'uploads', 'images')));
+    this.app.use(
+      '/images/',
+      express.static(resolve(__dirname, '..', 'uploads', 'images'))
+    );
   }
 
   routes() {
