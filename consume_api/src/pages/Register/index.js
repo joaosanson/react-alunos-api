@@ -41,9 +41,10 @@ export default function Register() {
 
   async function handleSubmit(event) {
     const { nome, email, password } = user;
-
     event.preventDefault();
+
     let formErrors = false;
+
     if (nome.length < 3 || nome.length > 255) {
       formErrors = true;
       toast.error('Nome deve ter entre 3 e 255 caracteres', {
