@@ -2,13 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { get } from 'lodash';
 import { isEmail, isInt, isFloat } from 'validator';
 import PropTypes from 'prop-types';
+import { useDispatch } from 'react-redux';
+import { FaUserCircle, FaEdit } from 'react-icons/fa';
+import { Link } from 'react-router-dom';
 
+import axios from '../../services/axios';
+import history from '../../services/history';
 import { Container } from '../../styles/GlobalStyles';
-import { Form } from './styled';
+import { Form, ProfilePicture, Title } from './styled';
 import { toast } from 'react-toastify';
 import Loading from '../../components/Loading';
+import * as actions from '../../store/modules/auth/actions';
+
 export default function Aluno({ match }) {
-  const id = get(match, 'params.id', 0);
+  const dispatch = useDispatch();
+
+  const id = get(match, 'params.id', '');
   const [user, setUser] = useState({
     nome: '',
     sobrenome: '',
@@ -17,10 +26,43 @@ export default function Aluno({ match }) {
     peso: '',
     altura: '',
   });
+  const [foto, setFoto] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
+
+    async function getData() {
+      try {
+        setIsLoading(true);
+        const { data } = await axios.get(`/alunos/${id}`);
+        const Foto = get(data, 'Fotos[0].url', '');
+        setFoto(Foto);
+
+        setUser((prev) => ({
+          ...prev,
+          nome: data.nome,
+          sobrenome: data.sobrenome,
+          email: data.email,
+          idade: data.idade,
+          peso: data.peso,
+          altura: data.altura,
+        }));
+
+        setIsLoading(false);
+      } catch (error) {
+        setIsLoading(false);
+        const status = get(error, 'response.status', 0);
+        const errors = get(error, 'response.data.erros', []);
+
+        if (status === 400) {
+          errors.map((err) => toast.error(err));
+          history.push('/');
+        }
+      }
+    }
+
+    getData();
   }, [id]);
 
   function handleChange(event) {
@@ -31,7 +73,7 @@ export default function Aluno({ match }) {
     }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
 
     const { nome, sobrenome, email, idade, peso, altura } = user;
@@ -53,17 +95,17 @@ export default function Aluno({ match }) {
       formErrors = true;
     }
 
-    if (!isInt(idade)) {
+    if (!isInt(String(idade))) {
       toast.error('Idade precisa ser um número inteiro.');
       formErrors = true;
     }
 
-    if (!isInt(peso) || isFloat(peso)) {
+    if (!isFloat(String(peso))) {
       toast.error('Peso precisa ser um número inteiro ou de ponto flutuante.');
       formErrors = true;
     }
 
-    if (!isInt(altura) || isFloat(altura)) {
+    if (!isFloat(String(altura))) {
       toast.error(
         'Altura precisa ser um número inteiro ou de ponto flutuante.',
       );
@@ -71,12 +113,72 @@ export default function Aluno({ match }) {
     }
 
     if (formErrors) return;
+
+    try {
+      setIsLoading(true);
+      if (id) {
+        // Editando
+        await axios.put(`/alunos/${id}`, {
+          nome,
+          sobrenome,
+          email,
+          idade,
+          peso,
+          altura,
+        });
+        toast.success('Aluno(a) editado(a) com sucesso.');
+      } else {
+        // Criando
+        const { data } = await axios.post(`/alunos/`, {
+          nome,
+          sobrenome,
+          email,
+          idade,
+          peso,
+          altura,
+        });
+        toast.success('Aluno(a) criado(a) com sucesso.');
+        history.push(`/aluno/${data.id}/edit`);
+      }
+    } catch (error) {
+      const status = get(error, 'response.status', 0);
+      const data = get(error, 'response.data', {});
+      const errors = get(data, 'errors', []);
+
+      if (errors.length > 0) {
+        errors.map((err) => toast.error(err));
+      } else {
+        toast.error('Erro desconhecido');
+      }
+
+      if (status === 401) {
+        dispatch(actions.loginFailure());
+      }
+
+      setIsLoading(false);
+    }
+    setIsLoading(false);
   }
 
   return (
     <Container>
       <Loading isLoading={isLoading} />
-      <h1>{id ? 'Editar aluno' : 'Novo Aluno'}</h1>
+
+      <Title>{id ? 'Editar aluno' : 'Novo Aluno'}</Title>
+
+      {id && (
+        <ProfilePicture>
+          {foto ? (
+            <img src={foto} alt={user.nome} />
+          ) : (
+            <FaUserCircle size={180} />
+          )}
+          <Link to={`/fotos/${id}`}>
+            <FaEdit size={24} />
+          </Link>
+        </ProfilePicture>
+      )}
+
       <Form onSubmit={handleSubmit}>
         <input
           type="text"
